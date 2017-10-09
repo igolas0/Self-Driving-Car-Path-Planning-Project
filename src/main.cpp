@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "spline.h"
 
 using namespace std;
 
@@ -196,6 +197,12 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
+  //start in lane 1
+  int lane = 1;
+
+  //define reference velocity in MPH
+  double vel_ref = 49.5;
+
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -240,40 +247,19 @@ int main() {
 
 
           	// define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-                double pos_x;
-                double pos_y;
-                double angle;
-                int path_size = previous_path_x.size();
+                double<double> ptsx;
+                double<double> ptsy;
 
-                for(int i = 0; i < path_size; i++)
-                {
-                   next_x_vals.push_back(previous_path_x[i]);
-                   next_y_vals.push_back(previous_path_y[i]);
-                }
-
-                if(path_size == 0)
-                {
-                   pos_x = car_x;
-                   pos_y = car_y;
-                   angle = deg2rad(car_yaw);
-                }
-                else
-                {
-                   pos_x = previous_path_x[path_size-1];
-                   pos_y = previous_path_y[path_size-1];
-
-                   double pos_x2 = previous_path_x[path_size-2];
-                   double pos_y2 = previous_path_y[path_size-2];
-                   angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-                }
-
-                double dist_inc = 0.5;
-                for(int i = 0; i < 50-path_size; i++)
+                double dist_inc = 0.3;
+                for(int i = 0; i < 50; i++)
                 {    
-                   next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
-                   next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
-                   pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
-                   pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
+                   double next_s = car_s+(i+1)*dist_inc;
+                   double next_d = 6;
+
+                   vector <double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+                   next_x_vals.push_back(xy[0]);
+                   next_y_vals.push_back(xy[1]);
                 }
 
           	msgJson["next_x"] = next_x_vals;
