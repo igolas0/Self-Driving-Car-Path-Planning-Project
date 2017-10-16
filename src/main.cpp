@@ -203,7 +203,10 @@ int main() {
   //define reference velocity in MPH
   double vel_ref = 0.0;
 
-  h.onMessage([&vel_ref,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  //default Menu = 1 (Keep Lane)
+  int menuItem = 1; 
+
+  h.onMessage([&menuItem, &vel_ref,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -271,16 +274,7 @@ int main() {
                      //check for cars in front if future paths collide
                      if((check_car_s > car_s) && ((check_car_s - car_s) < 30) )
                      {
-                        //reduce velocity to 29.5 mph
                         too_close = true;
-                        if(lane>0)
-                        {
-                           lane = 0;
-                        }
-                        else
-                        {
-                           lane += 1;
-                        }
                      }
                   }
                 }
@@ -292,6 +286,44 @@ int main() {
                 else if(vel_ref < 49.5)
                 {
                    vel_ref += 0.224;
+                }
+
+
+                switch(menuItem)
+                {
+                   //case KEEP LANE
+                   case(1): if(too_close)
+                   {
+                     cout << "keep lane. Lane: " << lane << endl;
+                     menuItem = 2;
+                   } 
+                   break;
+                   //case PREPARE LANE CHANGE
+                   case(2):   
+                   cout << "InsidePLC,before IF. Lane: " << lane << endl;
+                   if(lane==0)
+                   {
+                      cout << "PLC1. Lane: " << lane << endl;
+                      menuItem = 4;
+                   }
+                   else
+                   {
+                      cout << "PLC2. Lane: " << lane << endl;
+                      menuItem = 3;
+                   }
+                   break; 
+                   //case LANE CHANGE LEFT
+                   case(3):
+                   lane -= 1;
+                   cout << "LCL. Lane: " << lane << endl;
+                   menuItem = 1;
+                   break;
+                   //case LANE CHANGE RIGHT
+                   case(4):
+                   lane += 1;  
+                   cout << "LCR. Lane: " << lane << endl;
+                   menuItem = 1;
+                   break;
                 }
 
           	// define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
