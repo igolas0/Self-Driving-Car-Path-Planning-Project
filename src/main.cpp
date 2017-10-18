@@ -256,6 +256,7 @@ int main() {
                 }
 
                 bool too_close = false;
+                double next_car_front_id;
 
 
                 //find ref_v to use
@@ -275,6 +276,7 @@ int main() {
                      if((check_car_s > car_s) && ((check_car_s - car_s) < 30) )
                      {
                         too_close = true;
+                        next_car_front_id = i;
                      }
                   }
                 }
@@ -284,44 +286,154 @@ int main() {
                    vel_ref -= 0.224;
                 }
                 else if(vel_ref < 49.5)
-                {
-                   vel_ref += 0.224;
-                }
+                { 
+                   vel_ref += 0.224; 
+                } 
 
 
-                switch(menuItem)
-                {
-                   //case KEEP LANE
-                   case(1): if(too_close)
+                bool change_left = true;
+                bool change_right = true;
+                int next_car_left_id = -1;
+                int next_car_right_id = -1;
+                double score_left = 0.0;
+                double score_right = 0.0;
+                double score_center = 1.0;
+
+                switch(menuItem) { 
+                   //case KEEP LANE 
+                   case(1): if(too_close) 
                    {
-                     cout << "keep lane. Lane: " << lane << endl;
-                     menuItem = 2;
+                      //cout << "keep lane. Lane: " << lane << endl;
+                      menuItem = 2;
                    } 
                    break;
                    //case PREPARE LANE CHANGE
                    case(2):   
-                   cout << "InsidePLC,before IF. Lane: " << lane << endl;
-                   if(lane==0)
+                   //cout << "InsidePLC,before IF. Lane: " << lane << endl;
+
+                   //Loop over all cars in sensor fusion
+                   for(int i = 0; i < sensor_fusion.size(); i++)
                    {
-                      cout << "PLC1. Lane: " << lane << endl;
-                      menuItem = 4;
+                      float d = sensor_fusion[i][6];
+
+                      //check space in left lane (only if I am in lane 1 or 2)
+                      if(lane != 0)
+                      {
+                         if(d <(2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
+                         {
+                            if(change_left)
+                            {
+                               double vx = sensor_fusion[i][3];
+                               double vy = sensor_fusion[i][4];
+                               double check_speed = sqrt(vx*vx+vy*vy);
+                               double check_car_s= sensor_fusion[i][5];
+                               //project s coordinate in the future based on that car's speed
+                               double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
+
+                               //get car s position (since car_s overwritten with endpath if prev_size > 0)
+                               double car_s_pos = j[1]["s"];
+                               if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
+                               {
+                                  change_left = false;
+                               }
+                            }
+                            //track ID of nearest front car in LEFT lane
+                            if(check_car_s > car_s_pos)
+                            {
+                               if(next_car_left_id == -1)
+                               {
+                                  next_car_left_id = i;
+                               }
+                               else if(check_car_s < sensor_fusion[next_car_left_id][5])
+                               {
+                                  next_car_left_id = i;
+                               }
+                            }
+                         }
+                      }
+
+                      //check space in Right lane for lange change (only if I am in lane 0 or 1)
+                      if(lane != 2)
+                      {
+                         if(d <(2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
+                         {
+                            if(change_right)
+                            {
+                               double vx = sensor_fusion[i][3];
+                               double vy = sensor_fusion[i][4];
+                               double check_speed = sqrt(vx*vx+vy*vy);
+                               double check_car_s= sensor_fusion[i][5];
+                               //project s coordinate in the future based on that car's speed
+                               double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
+
+                               //get car s position (since car_s overwritten with endpath if prev_size > 0)
+                               double car_s_pos = j[1]["s"];
+                               if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
+                               {
+                                  change_left = false;
+                               }
+                            }
+                            //track ID of nearest front car in RIGHT lane
+                            if(check_car_s > car_s_pos)
+                            {
+                               if(next_car_left_id == -1)
+                               {
+                                  next_car_left_id = i;
+                               }
+                               else if(check_car_s < sensor_fusion[next_car_left_id][5])
+                               {
+                                  next_car_left_id = i;
+                               }
+                            }
+                         }
+                      }
                    }
-                   else
+
+                   //calculate score of left, right lane changes or staying in lane (based on projected position of front cars in each lane in 20 sec)
+                   //decide best decision based on higuest score
+
+                   if(change_left)
                    {
-                      cout << "PLC2. Lane: " << lane << endl;
+                      score_left = 99999.9
+                      if(next_left_car_id != -1)
+                      {
+                         score_left = sensor_fusion[next_car_left_id][5] + 20 * sqrt(sensor_fusion[next_car_left_id][3]*sensor_fusion[next_car_left_id][3]
+                                                                                 +sensor_fusion[next_car_left_id][4]*sensor_fusion[next_car_left_id][4]);
+                      }
+                   }
+                   if(change_right)
+                   {
+                      score_right = 99998.8
+                      if(next_right_car_id != -1)
+                      {
+                         score_right = sensor_fusion[next_car_right_id][5] + 20 * sqrt(sensor_fusion[next_car_right_id][3]*sensor_fusion[next_car_right_id][3]
+                                                                                   +sensor_fusion[next_car_right_id][4]*sensor_fusion[next_car_right_id][4]);
+                      }
+                   }
+                   score_center = sensor_fusion[next_car_front_id][5] + 20 * sqrt(sensor_fusion[next_car_front_id][3]*sensor_fusion[next_car_front_id][3]
+                                                                              +sensor_fusion[next_car_front_id][4]*sensor_fusion[next_car_front_id][4]);
+
+                   //if conditions for lane change not given or front car moving faster than traffic in side lanes --> do nothing
+                   if((change_left == 0.0 && change_right == 0.0) || ((score_center > score_left) && (score_center > score_right))) {}
+                   else if(score_left > score_right)
+                   {
                       menuItem = 3;
+                   }
+                   else if(score_right > score_left)
+                   {
+                      menuItem = 4;
                    }
                    break; 
                    //case LANE CHANGE LEFT
                    case(3):
                    lane -= 1;
-                   cout << "LCL. Lane: " << lane << endl;
+                   //cout << "LCL. Lane: " << lane << endl;
                    menuItem = 1;
                    break;
                    //case LANE CHANGE RIGHT
                    case(4):
                    lane += 1;  
-                   cout << "LCR. Lane: " << lane << endl;
+                   //cout << "LCR. Lane: " << lane << endl;
                    menuItem = 1;
                    break;
                 }
