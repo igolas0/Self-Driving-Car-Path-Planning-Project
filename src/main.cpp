@@ -298,6 +298,8 @@ int main() {
                 double score_left = 0.0;
                 double score_right = 0.0;
                 double score_center = 1.0;
+                double check_car_s;
+                double car_s_pos;
 
                 switch(menuItem) { 
                    //case KEEP LANE 
@@ -317,75 +319,77 @@ int main() {
                       float d = sensor_fusion[i][6];
 
                       //check space in left lane (only if I am in lane 1 or 2)
-                      if(lane != 0)
+                      if(lane == 0)
+                      {
+                         change_left = false;
+                      }
+                      if(change_left)
                       {
                          if(d <(2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
                          {
-                            if(change_left)
-                            {
                                double vx = sensor_fusion[i][3];
                                double vy = sensor_fusion[i][4];
                                double check_speed = sqrt(vx*vx+vy*vy);
-                               double check_car_s= sensor_fusion[i][5];
+                               check_car_s= sensor_fusion[i][5];
                                //project s coordinate in the future based on that car's speed
                                double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
 
                                //get car s position (since car_s overwritten with endpath if prev_size > 0)
-                               double car_s_pos = j[1]["s"];
+                               car_s_pos = j[1]["s"];
                                if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
                                {
                                   change_left = false;
                                }
-                            }
-                            //track ID of nearest front car in LEFT lane
-                            if(check_car_s > car_s_pos)
-                            {
-                               if(next_car_left_id == -1)
+                               //track ID of nearest front car in LEFT lane
+                               if(check_car_s > car_s_pos)
                                {
-                                  next_car_left_id = i;
+                                  if(next_car_left_id == -1)
+                                  {
+                                     next_car_left_id = i;
+                                  }
+                                  else if(check_car_s < sensor_fusion[next_car_left_id][5])
+                                  {
+                                     next_car_left_id = i;
+                                  }
                                }
-                               else if(check_car_s < sensor_fusion[next_car_left_id][5])
-                               {
-                                  next_car_left_id = i;
-                               }
-                            }
                          }
                       }
 
                       //check space in Right lane for lange change (only if I am in lane 0 or 1)
-                      if(lane != 2)
+                      if(lane == 2)
                       {
-                         if(d <(2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
-                         {
-                            if(change_right)
+                         change_right = false;
+                      }
+                      if(change_right)
+                      {
+                            if(d <(2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
                             {
                                double vx = sensor_fusion[i][3];
                                double vy = sensor_fusion[i][4];
                                double check_speed = sqrt(vx*vx+vy*vy);
-                               double check_car_s= sensor_fusion[i][5];
+                               check_car_s= sensor_fusion[i][5];
                                //project s coordinate in the future based on that car's speed
                                double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
 
                                //get car s position (since car_s overwritten with endpath if prev_size > 0)
-                               double car_s_pos = j[1]["s"];
+                               car_s_pos = j[1]["s"];
                                if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
                                {
-                                  change_left = false;
+                                  change_right = false;
                                }
                             }
                             //track ID of nearest front car in RIGHT lane
                             if(check_car_s > car_s_pos)
                             {
-                               if(next_car_left_id == -1)
+                               if(next_car_right_id == -1)
                                {
-                                  next_car_left_id = i;
+                                  next_car_right_id = i;
                                }
-                               else if(check_car_s < sensor_fusion[next_car_left_id][5])
+                               else if(check_car_s < sensor_fusion[next_car_right_id][5])
                                {
-                                  next_car_left_id = i;
+                                  next_car_right_id = i;
                                }
                             }
-                         }
                       }
                    }
 
@@ -394,24 +398,24 @@ int main() {
 
                    if(change_left)
                    {
-                      score_left = 99999.9
-                      if(next_left_car_id != -1)
+                      score_left = 99999.9;
+                      if(next_car_left_id != -1)
                       {
-                         score_left = sensor_fusion[next_car_left_id][5] + 20 * sqrt(sensor_fusion[next_car_left_id][3]*sensor_fusion[next_car_left_id][3]
-                                                                                 +sensor_fusion[next_car_left_id][4]*sensor_fusion[next_car_left_id][4]);
+                         score_left = (double)sensor_fusion[next_car_left_id][5] + 20 * sqrt((double)sensor_fusion[next_car_left_id][3] * (double)sensor_fusion[next_car_left_id][3]
+                                                                                   + (double)sensor_fusion[next_car_left_id][4] * (double)sensor_fusion[next_car_left_id][4]);
                       }
                    }
                    if(change_right)
                    {
-                      score_right = 99998.8
-                      if(next_right_car_id != -1)
+                      score_right = 99998.8;
+                      if(next_car_right_id != -1)
                       {
-                         score_right = sensor_fusion[next_car_right_id][5] + 20 * sqrt(sensor_fusion[next_car_right_id][3]*sensor_fusion[next_car_right_id][3]
-                                                                                   +sensor_fusion[next_car_right_id][4]*sensor_fusion[next_car_right_id][4]);
+                         score_right = (double)sensor_fusion[next_car_right_id][5] + 20 * sqrt((double)sensor_fusion[next_car_right_id][3] * (double)sensor_fusion[next_car_right_id][3]
+                                                                                     + (double)sensor_fusion[next_car_right_id][4] * (double)sensor_fusion[next_car_right_id][4]);
                       }
                    }
-                   score_center = sensor_fusion[next_car_front_id][5] + 20 * sqrt(sensor_fusion[next_car_front_id][3]*sensor_fusion[next_car_front_id][3]
-                                                                              +sensor_fusion[next_car_front_id][4]*sensor_fusion[next_car_front_id][4]);
+                   score_center = (double)sensor_fusion[next_car_front_id][5] + 20 * sqrt((double)sensor_fusion[next_car_front_id][3] * (double)sensor_fusion[next_car_front_id][3]
+                                                                                + (double)sensor_fusion[next_car_front_id][4] * (double)sensor_fusion[next_car_front_id][4]);
 
                    //if conditions for lane change not given or front car moving faster than traffic in side lanes --> do nothing
                    if((change_left == 0.0 && change_right == 0.0) || ((score_center > score_left) && (score_center > score_right))) {}
