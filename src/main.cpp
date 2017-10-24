@@ -336,7 +336,8 @@ int main() {
 
                                //get car s position (since car_s overwritten with endpath if prev_size > 0)
                                car_s_pos = j[1]["s"];
-                               if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
+                               if(((check_car_s > car_s_pos) && (((check_car_s_p - car_s) < 5) || ((check_car_s - car_s_pos) < 5))) 
+                                 || ((check_car_s < car_s_pos) && (((car_s - check_car_s_p) < 15) || ((car_s_pos - check_car_s) < 15)))) 
                                {
                                   change_left = false;
                                }
@@ -373,7 +374,8 @@ int main() {
 
                                //get car s position (since car_s overwritten with endpath if prev_size > 0)
                                car_s_pos = j[1]["s"];
-                               if(((check_car_s > car_s_pos) && ((check_car_s_p - car_s) < 5)) || ((check_car_s < car_s_pos) && ((car_s - check_car_s_p) < 5)))
+                               if(((check_car_s > car_s_pos) && (((check_car_s_p - car_s) < 5) || ((check_car_s - car_s_pos) < 5))) 
+                                 || ((check_car_s < car_s_pos) && (((car_s - check_car_s_p) < 15) || ((car_s_pos - check_car_s) < 15)))) 
                                {
                                   change_right = false;
                                }
@@ -393,7 +395,7 @@ int main() {
                       }
                    }
 
-                   //calculate score of left, right lane changes or staying in lane (based on projected position of front cars in each lane in 20 sec)
+                   //calculate score of left, right lane changes or staying in lane (based on projected position of front cars in each lane in 10 sec)
                    //decide best decision based on higuest score
 
                    if(change_left)
@@ -401,7 +403,7 @@ int main() {
                       score_left = 99999.9;
                       if(next_car_left_id != -1)
                       {
-                         score_left = (double)sensor_fusion[next_car_left_id][5] + 20 * sqrt((double)sensor_fusion[next_car_left_id][3] * (double)sensor_fusion[next_car_left_id][3]
+                         score_left = (double)sensor_fusion[next_car_left_id][5] + 10 * sqrt((double)sensor_fusion[next_car_left_id][3] * (double)sensor_fusion[next_car_left_id][3]
                                                                                    + (double)sensor_fusion[next_car_left_id][4] * (double)sensor_fusion[next_car_left_id][4]);
                       }
                    }
@@ -410,11 +412,11 @@ int main() {
                       score_right = 99998.8;
                       if(next_car_right_id != -1)
                       {
-                         score_right = (double)sensor_fusion[next_car_right_id][5] + 20 * sqrt((double)sensor_fusion[next_car_right_id][3] * (double)sensor_fusion[next_car_right_id][3]
+                         score_right = (double)sensor_fusion[next_car_right_id][5] + 10 * sqrt((double)sensor_fusion[next_car_right_id][3] * (double)sensor_fusion[next_car_right_id][3]
                                                                                      + (double)sensor_fusion[next_car_right_id][4] * (double)sensor_fusion[next_car_right_id][4]);
                       }
                    }
-                   score_center = (double)sensor_fusion[next_car_front_id][5] + 20 * sqrt((double)sensor_fusion[next_car_front_id][3] * (double)sensor_fusion[next_car_front_id][3]
+                   score_center = (double)sensor_fusion[next_car_front_id][5] + 10 * sqrt((double)sensor_fusion[next_car_front_id][3] * (double)sensor_fusion[next_car_front_id][3]
                                                                                 + (double)sensor_fusion[next_car_front_id][4] * (double)sensor_fusion[next_car_front_id][4]);
 
                    //if conditions for lane change not given or front car moving faster than traffic in side lanes --> do nothing
