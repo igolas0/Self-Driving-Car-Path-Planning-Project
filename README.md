@@ -40,7 +40,7 @@ Though being a relative simple model it achieves satisfying results most of the 
 
 ![alt text][image2]
 
-The best result achieved was almost 30 miles driven (27 miles) after a bit more than half an hour:
+The best result achieved was almost 30 miles driven without incidents (27 miles) after a bit more than half an hour:
 
 ![alt text][image3]
 
@@ -50,12 +50,12 @@ The resulting decision making is able to make lane changes to advance fast that 
 
 Here is a list of identified issues which would need being solved:
 
-- The model seems to be more mistake prone when driving along congestionated traffic. Especially problematic seems to be taking into account vehicles which are performing a lane change into our potential target lane.
+- The model seems to be more mistake prone when driving along congested traffic. Especially problematic seems to be taking into account vehicles which are performing a lane change into our potential target lane.
 - Only the traffic in the immediate side lanes is considered. Thus a double lane change to the right or left is not immediately considered. 
 - The model asumes every other car will keep driving the same lane. A more sofisticated prediction model would be needed to make more complex and accurate decisions on edge cases.
 - Sometimes the model would perform a lane change (e.g. to the left) to a slightly faster advancing lane while the best move would be to wait for a fast car on the right lane to pass by and then perform a right lane change behind it. Modeling this kind of behaviour would need as stated above a more sofisticated prediction model and decision logic. 
 - The car seemed sometimes somehow overly cautious before making clear lane changing decision.
-- While driving in congestionated traffic in occasions it loops very fast over left and right lane changes. Mostly when the car in front of us inside our new target lane suddenly hits the brakes, but later continues to advance faster than current lane and then hits the brakes again...
+- While driving in congested traffic in occasions it loops very fast over left and right lane changes. Mostly when the car in front of us inside our new target lane suddenly hits the brakes, but later continues to advance faster than current lane and then hits the brakes again...
 
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
