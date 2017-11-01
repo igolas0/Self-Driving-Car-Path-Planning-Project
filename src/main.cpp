@@ -1,10 +1,13 @@
-#include <fstream>
 #include <math.h>
-#include <uWS/uWS.h>
+
+#include <fstream>
 #include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
+
+#include <uWS/uWS.h>
+
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
@@ -45,7 +48,7 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 	double closestLen = 100000; //large number
 	int closestWaypoint = 0;
 
-	for(int i = 0; i < maps_x.size(); i++)
+	for(int i = 0; i < maps_x.size(); ++i)
 	{
 		double map_x = maps_x[i];
 		double map_y = maps_y[i];
@@ -121,7 +124,7 @@ vector<double> getFrenet(double x, double y, double theta, const vector<double> 
 
 	// calculate s value
 	double frenet_s = 0;
-	for(int i = 0; i < prev_wp; i++)
+	for(int i = 0; i < prev_wp; ++i)
 	{
 		frenet_s += distance(maps_x[i],maps_y[i],maps_x[i+1],maps_y[i+1]);
 	}
@@ -203,7 +206,7 @@ int main() {
   //define reference velocity in MPH
   double vel_ref = 0.0;
 
-  //default Menu = 1 (Keep Lane)
+  //default Menu = 1 (Keep Lane). This will be used later to switch between states (Keep lane, lane change,...)
   int menuItem = 1; 
 
   h.onMessage([&menuItem, &vel_ref,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -248,50 +251,62 @@ int main() {
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
 
+                //store previous path size
                 int prev_size = previous_path_x.size();
 
+                //set s coordinate of the car to end of previous path
                 if(prev_size > 0)
                 {
                    car_s = end_path_s;
                 }
 
+
+                //boolean variable will be set to true if we encounter cars in our lane
                 bool too_close = false;
-                double next_car_front_id;
+                //variable to track ID of front car (ID in sensor fusion data)
+                int next_car_front_id;
+                //keep track of front car speed if vehicle too close,
+                // so that we can adapt our speed
+                double front_speed;
 
 
-                //find ref_v to use
-                for(int i = 0; i < sensor_fusion.size(); i++)
+                // Loop over sensor fusion. If we encounter a car driving 
+                // our same lane in front of us then set too_close
+                // variable to TRUE and track ID of that car. 
+                // Later we will adapt our speed based on this
+                for(int i = 0; i < sensor_fusion.size(); ++i)
                 {
-                  //if car is in my lane
                   float d = sensor_fusion[i][6];
-                  if(d <(2+4*lane+2) && d > (2+4*lane-2) )
+                  if(d <(2+4*lane+2) && d > (2+4*lane-2))  //if car is in my lane
                   {
                      double vx = sensor_fusion[i][3];
                      double vy = sensor_fusion[i][4];
                      double check_speed = sqrt(vx*vx+vy*vy);
                      double check_car_s= sensor_fusion[i][5];
-                     //project s coordinate in the future based on that car's speed
+                     //project s coordinate of front car in the future based on that car's speed
                      check_car_s += ((double)prev_size * 0.02 * check_speed);
                      //check for cars in front if future paths collide
                      if((check_car_s > car_s) && ((check_car_s - car_s) < 30) )
                      {
                         too_close = true;
                         next_car_front_id = i;
+                        front_speed = check_speed;
                      }
                   }
                 }
-
-                if(too_close)
+                //if front vehicle too close decrease speed until we are driving 
+                // at roughly same speed. Else accelerate until just below speed limit
+                if(too_close && (vel_ref > front_speed))
                 {
-                   vel_ref -= 0.224;
+                   vel_ref -= 0.2;
                 }
                 else if(vel_ref < 49.5)
                 { 
                    vel_ref += 0.224; 
                 } 
 
-
-                bool change_left = true;
+                //defining some variables to manage lane change decisions
+                bool change_left = true; 
                 bool change_right = true;
                 int next_car_left_id = -1;
                 int next_car_right_id = -1;
@@ -301,20 +316,20 @@ int main() {
                 double check_car_s;
                 double car_s_pos;
 
+                //implement switch as a state machine to manage lane changes
                 switch(menuItem) { 
-                   //case KEEP LANE 
+                   //case menuItem=1 equals KEEP LANE 
                    case(1): if(too_close) 
                    {
-                      //cout << "keep lane. Lane: " << lane << endl;
                       menuItem = 2;
                    } 
                    break;
-                   //case PREPARE LANE CHANGE
+                   //case menuItem=2 equals PREPARE LANE CHANGE
                    case(2):   
-                   //cout << "InsidePLC,before IF. Lane: " << lane << endl;
 
-                   //Loop over all cars in sensor fusion
-                   for(int i = 0; i < sensor_fusion.size(); i++)
+                   // Loop over all cars in sensor fusion and assert viability of 
+                   // left and right lane changes
+                   for(int i = 0; i < sensor_fusion.size(); ++i)
                    {
                       float d = sensor_fusion[i][6];
 
@@ -334,8 +349,12 @@ int main() {
                                //project s coordinate in the future based on that car's speed
                                double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
 
-                               //get car s position (since car_s overwritten with endpath if prev_size > 0)
+                               //get our car s position (since car_s overwritten with endpath above if prev_size > 0)
                                car_s_pos = j[1]["s"];
+
+                               // check for available space in target lane based on current and projected positions
+                               // of our and other cars. (Differenciating front and rear cars). Safety margins of 5 meters
+                               // for front cars and 15 meters for cars approximating from behind.
                                if(((check_car_s > car_s_pos) && (((check_car_s_p - car_s) < 5) || ((check_car_s - car_s_pos) < 5))) 
                                  || ((check_car_s < car_s_pos) && (((car_s - check_car_s_p) < 15) || ((car_s_pos - check_car_s) < 15)))) 
                                {
@@ -355,8 +374,8 @@ int main() {
                                }
                          }
                       }
-
-                      //check space in Right lane for lange change (only if I am in lane 0 or 1)
+                      // now the same is done for the right lane.
+                      // check space in Right lane for lange change (only if I am in lane 0 or 1)
                       if(lane == 2)
                       {
                          change_right = false;
@@ -372,7 +391,7 @@ int main() {
                                //project s coordinate in the future based on that car's speed
                                double check_car_s_p = (check_car_s + (double)prev_size * 0.02 * check_speed);
 
-                               //get car s position (since car_s overwritten with endpath if prev_size > 0)
+                               //get our car s position (since car_s overwritten with endpath if prev_size > 0)
                                car_s_pos = j[1]["s"];
                                if(((check_car_s > car_s_pos) && (((check_car_s_p - car_s) < 5) || ((check_car_s - car_s_pos) < 5))) 
                                  || ((check_car_s < car_s_pos) && (((car_s - check_car_s_p) < 15) || ((car_s_pos - check_car_s) < 15)))) 
@@ -394,17 +413,19 @@ int main() {
                             }
                       }
                    }
-
-                   //calculate score of left, right lane changes or staying in lane (based on projected position of front cars in each lane in 10 sec)
-                   //decide best decision based on higuest score
+                   // Next we set as scoring system to determine which lane change (or lane keeping) will
+                   // allow us to advance more based on projected position of front cars in each lane after 10 sec.
+                   // Higher scores are better.
 
                    if(change_left)
                    {
                       score_left = 99999.9;
-                      if(next_car_left_id != -1)
+                      if(next_car_left_id != -1)  
                       {
-                         score_left = (double)sensor_fusion[next_car_left_id][5] + 10 * sqrt((double)sensor_fusion[next_car_left_id][3] * (double)sensor_fusion[next_car_left_id][3]
-                                                                                   + (double)sensor_fusion[next_car_left_id][4] * (double)sensor_fusion[next_car_left_id][4]);
+                         //score based on extrapolating the nearest front car's s position in left lane 10s into the future (based on its speed)
+                         score_left = (double)sensor_fusion[next_car_left_id][5] 
+                                      + 10 * sqrt((double)sensor_fusion[next_car_left_id][3] * (double)sensor_fusion[next_car_left_id][3]
+                                      + (double)sensor_fusion[next_car_left_id][4] * (double)sensor_fusion[next_car_left_id][4]);
                       }
                    }
                    if(change_right)
@@ -412,12 +433,14 @@ int main() {
                       score_right = 99998.8;
                       if(next_car_right_id != -1)
                       {
-                         score_right = (double)sensor_fusion[next_car_right_id][5] + 10 * sqrt((double)sensor_fusion[next_car_right_id][3] * (double)sensor_fusion[next_car_right_id][3]
-                                                                                     + (double)sensor_fusion[next_car_right_id][4] * (double)sensor_fusion[next_car_right_id][4]);
+                         score_right = (double)sensor_fusion[next_car_right_id][5] 
+                                     + 10 * sqrt((double)sensor_fusion[next_car_right_id][3] * (double)sensor_fusion[next_car_right_id][3]
+                                     + (double)sensor_fusion[next_car_right_id][4] * (double)sensor_fusion[next_car_right_id][4]);
                       }
                    }
-                   score_center = (double)sensor_fusion[next_car_front_id][5] + 10 * sqrt((double)sensor_fusion[next_car_front_id][3] * (double)sensor_fusion[next_car_front_id][3]
-                                                                                + (double)sensor_fusion[next_car_front_id][4] * (double)sensor_fusion[next_car_front_id][4]);
+                   score_center = (double)sensor_fusion[next_car_front_id][5] 
+                                + 10 * sqrt((double)sensor_fusion[next_car_front_id][3] * (double)sensor_fusion[next_car_front_id][3]
+                                + (double)sensor_fusion[next_car_front_id][4] * (double)sensor_fusion[next_car_front_id][4]);
 
                    //if conditions for lane change not given or front car moving faster than traffic in side lanes --> do nothing
                    if((change_left == 0.0 && change_right == 0.0) || ((score_center > score_left) && (score_center > score_right))) {}
@@ -430,16 +453,14 @@ int main() {
                       menuItem = 4;
                    }
                    break; 
-                   //case LANE CHANGE LEFT
+                   //case menuItem=3 equals LANE CHANGE LEFT
                    case(3):
                    lane -= 1;
-                   //cout << "LCL. Lane: " << lane << endl;
                    menuItem = 1;
                    break;
-                   //case LANE CHANGE RIGHT
+                   //case menuItem=4 equals LANE CHANGE RIGHT
                    case(4):
                    lane += 1;  
-                   //cout << "LCR. Lane: " << lane << endl;
                    menuItem = 1;
                    break;
                 }
@@ -482,10 +503,10 @@ int main() {
                   ptsy.push_back(ref_y_prev);
                   ptsy.push_back(ref_y);
                 }
-                //In Frenet add evenly 30m spaced points ahead of the starting reference
-                vector<double> next_mp0 = getXY(car_s+30,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
-                vector<double> next_mp1 = getXY(car_s+60,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
-                vector<double> next_mp2 = getXY(car_s+90,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+                //In Frenet add evenly 30m spaced points ahead of the starting reference (in target lane)
+                vector<double> next_mp0 = getXY(car_s+30,(2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                vector<double> next_mp1 = getXY(car_s+60,(2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                vector<double> next_mp2 = getXY(car_s+90,(2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
 
                 ptsx.push_back(next_mp0[0]);
@@ -497,7 +518,7 @@ int main() {
                 ptsy.push_back(next_mp2[1]);
 
 
-                for(int i = 0; i < ptsx.size(); i++)
+                for(int i = 0; i < ptsx.size(); ++i)
                 {    
                    //shift car reference angle to 0 degrees
                    double shift_x = (ptsx[i]-ref_x);
@@ -512,7 +533,7 @@ int main() {
                 //set (x,y) points to the spline
                 s.set_points(ptsx,ptsy);
 
-                for(int i = 0; i < previous_path_x.size(); i++)
+                for(int i = 0; i < previous_path_x.size(); ++i)
                 {    
                   next_x_vals.push_back(previous_path_x[i]);
                   next_y_vals.push_back(previous_path_y[i]);
@@ -524,7 +545,7 @@ int main() {
 
                 double x_add_on = 0;
 
-                for(int i = 1; i <= 50-previous_path_x.size(); i++)
+                for(int i = 1; i <= 50-previous_path_x.size(); ++i)
                 {    
                   double N = (target_dist/(0.02*vel_ref/2.24));
                   double x_point = (x_add_on+(target_x/N));
