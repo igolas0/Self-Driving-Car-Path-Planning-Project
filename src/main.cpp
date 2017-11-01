@@ -200,7 +200,7 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  //start in lane 1
+  //start in lane 1 (this variable represents our target lane)
   int lane = 1;
 
   //define reference velocity in MPH
@@ -353,8 +353,8 @@ int main() {
                                car_s_pos = j[1]["s"];
 
                                // check for available space in target lane based on current and projected positions
-                               // of our and other cars. (Differenciating front and rear cars). Safety margins of 5 meters
-                               // for front cars and 15 meters for cars approximating from behind.
+                               // of our and other cars. (Differenciating front and rear cars). Safety margins of 10 meters
+                               // for front cars and 20 meters for cars approximating from behind.
                                if(((check_car_s > car_s_pos) && (((check_car_s_p - car_s) < 5) || ((check_car_s - car_s_pos) < 5))) 
                                  || ((check_car_s < car_s_pos) && (((car_s - check_car_s_p) < 15) || ((car_s_pos - check_car_s) < 15)))) 
                                {
